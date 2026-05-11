@@ -1,7 +1,6 @@
 .env
 __pycache__/
 *.py[cod]
-*.pkl
 trustlayer/ml/models/*.pkl
 trustlayer/ml/synthetic_data.csv
 .venv/

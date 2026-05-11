@@ -19,6 +19,8 @@ class User(Base):
     identity_confidence = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    user_handle = Column(String, nullable=True, unique=True, index=True)  # e.g. usr_adaeze001
+
     squad_events = relationship("SquadEvent", back_populates="user")
     trust_scores = relationship("TrustScore", back_populates="user")
     consents = relationship("Consent", back_populates="user")

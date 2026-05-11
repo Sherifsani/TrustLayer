@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from api.models.db_models import TrustScore as TrustScoreModel, Consent, SquadEvent, User
 from api.models.schemas import TrustScoreResult
+from db.session import get_user
 from integrations import mono
 from ml import scoring_model, anomaly_detector
 
@@ -67,11 +68,12 @@ def _collect_squad_features(squad_events: list) -> dict:
 
 
 async def compute_trust_score(user_id: str, business_id: str, db: Session) -> TrustScoreResult:
-    # 1. Load user record for KYC proxy (identity_confidence → bvn_confidence)
-    user = db.query(User).filter(User.id == user_id).first()
+    # 1. Resolve handle or UUID → actual User row so FK writes always use real UUID
+    user = get_user(db, user_id)
+    resolved_id = user.id if user else user_id  # fall back to string only if user not found
 
     # 2. Load SquadEvent records and compute transaction features
-    squad_events = db.query(SquadEvent).filter(SquadEvent.user_id == user_id).all()
+    squad_events = db.query(SquadEvent).filter(SquadEvent.user_id == resolved_id).all()
     squad_features = _collect_squad_features(squad_events)
 
     # 3. Telco features (mocked via Mono)
@@ -103,13 +105,13 @@ async def compute_trust_score(user_id: str, business_id: str, db: Session) -> Tr
     # 5. Hard rules — return early if blocked
     if features.get("nin_watchlisted") == 1:
         return _save_and_return(
-            db, user_id, score=0, risk="blocked",
+            db, resolved_id, score=0, risk="blocked",
             drivers=["NIN watchlist status → blocked"],
             signals_used=signals_used,
         )
     if features.get("aml_risk_level") == 2:
         return _save_and_return(
-            db, user_id, score=0, risk="blocked",
+            db, resolved_id, score=0, risk="blocked",
             drivers=["AML risk screening → blocked"],
             signals_used=signals_used,
         )
@@ -137,7 +139,7 @@ async def compute_trust_score(user_id: str, business_id: str, db: Session) -> Tr
     risk = _risk_level(final_score)
 
     return _save_and_return(
-        db, user_id, score=final_score, risk=risk,
+        db, resolved_id, score=final_score, risk=risk,
         drivers=drivers, signals_used=signals_used,
     )
 

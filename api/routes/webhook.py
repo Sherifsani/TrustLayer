@@ -53,8 +53,11 @@ async def squad_webhook(
     db.add(event)
     db.commit()
 
-    # Fire-and-forget score recompute — never block the webhook response
-    from api.celery_app import recompute_score
-    recompute_score.delay(str(user.id), business_id="system")
+    # Fire-and-forget — never let Celery/Redis errors block the 200 response
+    try:
+        from api.celery_app import recompute_score
+        recompute_score.delay(str(user.id), business_id="system")
+    except Exception as exc:
+        logger.error("Failed to dispatch recompute_score task: %s", exc)
 
     return {"status": "ok"}

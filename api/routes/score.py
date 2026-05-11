@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_business_api_key, get_db
-from api.models.db_models import User
 from api.models.schemas import ScoreRequest, ScoreResponse
+from db.session import get_user
 from ml.pipeline import compute_trust_score
 
 router = APIRouter()
@@ -15,7 +15,7 @@ async def score(
     db: Session = Depends(get_db),
     business_id: str = Depends(get_business_api_key),
 ):
-    user = db.query(User).filter(User.id == payload.user_id).first()
+    user = get_user(db, payload.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 

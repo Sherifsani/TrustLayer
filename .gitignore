@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.py[cod]
+*.pkl
+trustlayer/ml/models/*.pkl
+trustlayer/ml/synthetic_data.csv
+.venv/
+venv/
+node_modules/
+trustlayer/dashboard/node_modules/
+trustlayer/dashboard/build/
+*.egg-info/
+dist/
+.pytest_cache/

@@ -139,13 +139,29 @@ async def compute_trust_score(user_id: str, business_id: str, db: Session) -> Tr
     if not drivers:
         drivers = ["Insufficient data to generate explanation"]
 
-    # 9–10. Risk level and recommendation
+    # 9. Risk level and recommendation
     final_score = max(0, min(100, round(final_score)))
     risk = _risk_level(final_score)
+
+    # 10. Sub-scores for the frontend Identity Vault panel
+    authenticity_score = round(
+        kyc_features["bvn_confidence"] * 35
+        + kyc_features["liveness_score"] * 35
+        + (1 - kyc_features["nin_watchlisted"]) * 20
+        + kyc_features["phone_name_match"] * 10
+    )
+    reliability_score = round(
+        min(features.get("txn_count_90d", 0) / 30, 1) * 40
+        + (1 - features.get("txn_failure_rate", 0.5)) * 30
+        + features.get("telco_borrow_repaid", 0) * 15
+        + (1 - min(features.get("bounce_count_90d", 0) / 5, 1)) * 15
+    )
 
     return _save_and_return(
         db, resolved_id, score=final_score, risk=risk,
         drivers=drivers, signals_used=signals_used,
+        reliability_score=reliability_score,
+        authenticity_score=authenticity_score,
     )
 
 
@@ -156,6 +172,8 @@ def _save_and_return(
     risk: str,
     drivers: list,
     signals_used: list,
+    reliability_score: int = 0,
+    authenticity_score: int = 0,
 ) -> TrustScoreResult:
     now = datetime.utcnow()
     record = TrustScoreModel(
@@ -174,6 +192,8 @@ def _save_and_return(
         score=score,
         risk_level=risk,
         recommendation=_recommendation(risk),
+        reliability_score=reliability_score,
+        authenticity_score=authenticity_score,
         drivers=drivers,
         signals_used=signals_used,
         computed_at=now,

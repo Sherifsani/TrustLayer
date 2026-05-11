@@ -24,3 +24,24 @@ def recompute_score(user_id: str, business_id: str = "system") -> None:
         asyncio.run(compute_trust_score(user_id, business_id=business_id, db=db))
     finally:
         db.close()
+
+
+@celery_app.task(name="generate_report")
+def generate_report(report_id: str) -> None:
+    import time
+    import uuid as _uuid
+
+    from db.session import SessionLocal
+    from api.models.db_models import Report
+
+    time.sleep(3)  # simulate generation
+
+    db = SessionLocal()
+    try:
+        report = db.query(Report).filter(Report.id == _uuid.UUID(report_id)).first()
+        if report:
+            report.status = "ready"
+            report.file_url = f"https://trustlayer.demo/reports/{report_id}.pdf"
+            db.commit()
+    finally:
+        db.close()

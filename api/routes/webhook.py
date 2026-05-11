@@ -53,6 +53,24 @@ async def squad_webhook(
     db.add(event)
     db.commit()
 
+    # Handle report payment completion — txn_ref "report_<uuid>" triggers generation
+    txn_ref = payload.Body.transaction_ref
+    if txn_ref.startswith("report_"):
+        report_id_str = txn_ref.removeprefix("report_")
+        try:
+            import uuid as _uuid
+            from api.models.db_models import Report
+            report = db.query(Report).filter(
+                Report.id == _uuid.UUID(report_id_str)
+            ).first()
+            if report:
+                report.status = "generating"
+                db.commit()
+                from api.celery_app import generate_report
+                generate_report.delay(report_id_str)
+        except Exception as exc:
+            logger.error("Failed to process report payment: %s", exc)
+
     # Fire-and-forget — never let Celery/Redis errors block the 200 response
     try:
         from api.celery_app import recompute_score

@@ -34,11 +34,13 @@ class ScoreResponse(BaseModel):
     trust_score: int
     risk_level: str
     recommendation: str
+    reliability_score: int
+    authenticity_score: int
     drivers: List[str]
     signals_used: List[str]
 
 
-# --- Report ---
+# --- Report (legacy GET /report/:user_id endpoint) ---
 
 class ReportResponse(BaseModel):
     user_id: str
@@ -66,8 +68,6 @@ class ConsentResponse(BaseModel):
     revoked: bool
 
 
-# --- Webhook ---
-
 # --- Internal pipeline return type ---
 
 class TrustScoreResult(BaseModel):
@@ -75,6 +75,8 @@ class TrustScoreResult(BaseModel):
     score: int
     risk_level: str
     recommendation: str
+    reliability_score: int = 0
+    authenticity_score: int = 0
     drivers: List[str]
     signals_used: List[str]
     computed_at: datetime
@@ -96,3 +98,93 @@ class SquadWebhookPayload(BaseModel):
     Event: str
     TransactionRef: str
     Body: SquadWebhookBody
+
+
+# --- User profile ---
+
+class UserProfileResponse(BaseModel):
+    user_id: str
+    first_name: Optional[str]
+    last_name: Optional[str]
+    email: str
+    phone: str
+    location: Optional[str]
+    kyc_status: str
+    identity_confidence: float
+    joined: datetime
+    nin_masked: str
+    bvn_masked: str
+
+
+# --- Score history ---
+
+class ScorePoint(BaseModel):
+    score: int
+    computed_at: datetime
+
+
+class ScoreHistoryResponse(BaseModel):
+    user_id: str
+    history: List[ScorePoint]
+    current_score: int
+    change_since_start: int
+
+
+# --- Activity feed ---
+
+class ActivityEvent(BaseModel):
+    id: str
+    description: str
+    source: str
+    source_type: str
+    timestamp: datetime
+    score_impact: Optional[int]
+    type: str
+
+
+class ActivityResponse(BaseModel):
+    user_id: str
+    events: List[ActivityEvent]
+
+
+# --- Reports list ---
+
+class ReportItem(BaseModel):
+    id: str
+    title: str
+    report_type: str
+    recipient_name: Optional[str]
+    pages: Optional[int]
+    status: str
+    created_at: datetime
+    file_url: Optional[str]
+
+
+class ReportsListResponse(BaseModel):
+    reports: List[ReportItem]
+
+
+class InitiatePaymentRequest(BaseModel):
+    user_id: str
+    report_type: str
+    recipient_id: Optional[str] = None
+
+
+class InitiatePaymentResponse(BaseModel):
+    report_id: str
+    checkout_url: str
+    txn_ref: str
+    amount: int
+
+
+# --- Auth ---
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user_id: str

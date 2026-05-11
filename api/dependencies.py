@@ -43,7 +43,8 @@ async def get_current_user(
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    user = db.query(User).filter(User.id == user_id).first()
+    from db.session import get_user as _get_user
+    user = _get_user(db, user_id)   # handles both UUID and user_handle (e.g. usr_adaeze001)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user

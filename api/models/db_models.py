@@ -22,9 +22,14 @@ class User(Base):
     user_handle = Column(String, nullable=True, unique=True, index=True)  # e.g. usr_adaeze001
     kyc_signals = Column(JSON, nullable=True, default=dict)
 
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    location = Column(String, nullable=True)
+
     squad_events = relationship("SquadEvent", back_populates="user")
     trust_scores = relationship("TrustScore", back_populates="user")
     consents = relationship("Consent", back_populates="user")
+    reports = relationship("Report", back_populates="user")
 
 
 class SquadEvent(Base):
@@ -68,3 +73,20 @@ class Consent(Base):
     revoked = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="consents")
+
+
+class Report(Base):
+    __tablename__ = "reports"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    title = Column(String, nullable=False)
+    report_type = Column(String, nullable=False)      # verified_trust_report | identity_snapshot
+    recipient_id = Column(String, nullable=True)
+    recipient_name = Column(String, nullable=True)
+    pages = Column(Integer, nullable=True)
+    status = Column(String, default="pending")        # ready | pending | generating
+    created_at = Column(DateTime, default=datetime.utcnow)
+    file_url = Column(String, nullable=True)
+
+    user = relationship("User", back_populates="reports")

@@ -25,6 +25,8 @@ async def score(
             trust_score=0,
             risk_level="blocked",
             recommendation="decline",
+            reliability_score=0,
+            authenticity_score=0,
             drivers=["User is blocked due to KYC/AML failure"],
             signals_used=[],
         )
@@ -34,6 +36,8 @@ async def score(
         trust_score=result.score,
         risk_level=result.risk_level,
         recommendation=result.recommendation,
+        reliability_score=result.reliability_score,
+        authenticity_score=result.authenticity_score,
         drivers=result.drivers,
         signals_used=result.signals_used,
     )

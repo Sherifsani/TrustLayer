@@ -132,6 +132,9 @@ phone: str
 email: str
 kyc_status: str        # pending | verified | failed | blocked
 identity_confidence: float
+kyc_signals: JSON      # individual Dojah signal results stored at onboarding
+                       # keys: bvn_confidence, nin_watchlisted, liveness_score,
+                       #       doc_authentic, phone_name_match, aml_risk_level
 created_at: datetime
 
 # squad_events

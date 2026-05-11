@@ -84,32 +84,37 @@ async def compute_trust_score(user_id: str, business_id: str, db: Session) -> Tr
         "telco_borrow_repaid": int(telco["borrow_repaid_ontime"]),
     }
 
-    # 4. Merge — KYC features neutral until onboard route populates them
+    # 4. KYC features — read from stored kyc_signals, fall back to neutral if not yet onboarded
+    kyc = (user.kyc_signals or {}) if user else {}
+    kyc_features = {
+        "bvn_confidence":   kyc.get("bvn_confidence", 0.5),
+        "nin_watchlisted":  kyc.get("nin_watchlisted", 0),
+        "liveness_score":   kyc.get("liveness_score", 0.5),
+        "doc_authentic":    kyc.get("doc_authentic", 1),
+        "phone_name_match": kyc.get("phone_name_match", 0.5),
+        "aml_risk_level":   kyc.get("aml_risk_level", 0),
+    }
+
     features: dict = {}
     features.update(squad_features)
     features.update(telco_features)
-    features["bvn_confidence"] = user.identity_confidence if user else 0.5
-    features.setdefault("nin_watchlisted", 0)
-    features.setdefault("liveness_score", 0.5)
-    features.setdefault("doc_authentic", 0.5)
-    features.setdefault("phone_name_match", 0.5)
+    features.update(kyc_features)
     features.setdefault("income_stability", 0.5)
-    features.setdefault("aml_risk_level", 0)
 
     signals_used = ["telco_data"]
     if squad_events:
         signals_used.append("squad_history")
-    if user and user.identity_confidence:
+    if user and user.kyc_signals:
         signals_used.append("kyc")
 
     # 5. Hard rules — return early if blocked
-    if features.get("nin_watchlisted") == 1:
+    if kyc_features["nin_watchlisted"] == 1:
         return _save_and_return(
             db, resolved_id, score=0, risk="blocked",
             drivers=["NIN watchlist status → blocked"],
             signals_used=signals_used,
         )
-    if features.get("aml_risk_level") == 2:
+    if kyc_features["aml_risk_level"] == 2:
         return _save_and_return(
             db, resolved_id, score=0, risk="blocked",
             drivers=["AML risk screening → blocked"],
@@ -120,7 +125,7 @@ async def compute_trust_score(user_id: str, business_id: str, db: Session) -> Tr
     base_score = scoring_model.predict_score(features)
 
     # Liveness hard cap (doesn't block — caps at 20)
-    if features.get("liveness_score", 1.0) < 0.5:
+    if kyc_features["liveness_score"] < 0.5:
         base_score = min(base_score, 20.0)
 
     # 7. Anomaly detector — 0.7 multiplier if unusual pattern detected

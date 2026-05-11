@@ -20,6 +20,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user_handle = Column(String, nullable=True, unique=True, index=True)  # e.g. usr_adaeze001
+    kyc_signals = Column(JSON, nullable=True, default=dict)
 
     squad_events = relationship("SquadEvent", back_populates="user")
     trust_scores = relationship("TrustScore", back_populates="user")

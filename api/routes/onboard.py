@@ -22,41 +22,62 @@ async def onboard(payload: OnboardRequest, db: Session = Depends(get_db)):
         dojah.screen_aml(payload.first_name, payload.last_name, dob=None),
     )
 
-    # Extract values — degrade gracefully if any Dojah call failed
-    bvn_conf = float(bvn_result.get("confidence", 0.5)) if "error" not in bvn_result else 0.5
-    liveness_val = float(liveness_result.get("score", 0.5)) if "error" not in liveness_result else 0.5
-    nin_watchlisted = bool(nin_result.get("watchlisted", False)) if "error" not in nin_result else False
-    nin_valid = 0.0 if nin_watchlisted else 1.0
-    raw_phone_match = phone_result.get("name_match", 0.5) if "error" not in phone_result else 0.5
-    phone_match = (1.0 if raw_phone_match else 0.0) if isinstance(raw_phone_match, bool) else float(raw_phone_match)
+    # Extract individual KYC signal values — degrade gracefully to neutral if any call failed
+    bvn_confidence = (
+        bvn_result.get("entity", {}).get("bvn", {}).get("confidence_value", 50) / 100
+        if "error" not in bvn_result else 0.5
+    )
+
+    nin_entity = nin_result.get("entity", {}) if "error" not in nin_result else {}
+    nin_watchlisted = 1 if str(nin_entity.get("watch_listed", "NO")).upper() == "YES" else 0
+
+    liveness_score = (
+        liveness_result.get("entity", {}).get("confidence_value", 50) / 100
+        if "error" not in liveness_result else 0.5
+    )
+
+    doc_authentic = 1  # no document uploaded at onboard yet — default to authentic
+
+    phone_entity = phone_result.get("entity", {}) if "error" not in phone_result else {}
+    phone_first = str(phone_entity.get("first_name", "")).upper()
+    provided_first = str(payload.first_name).upper()
+    phone_name_match = 1 if phone_first and phone_first in provided_first else 0
+
+    aml_entity = aml_result.get("entity", {}) if (
+        "error" not in aml_result and isinstance(aml_result.get("entity"), dict)
+    ) else {}
+    aml_risk_raw = str(aml_entity.get("risk_level", "low")).lower()
+    aml_risk_level = {"low": 0, "medium": 1, "high": 2}.get(aml_risk_raw, 0)
+
+    kyc_signals = {
+        "bvn_confidence": bvn_confidence,
+        "nin_watchlisted": nin_watchlisted,
+        "liveness_score": liveness_score,
+        "doc_authentic": doc_authentic,
+        "phone_name_match": phone_name_match,
+        "aml_risk_level": aml_risk_level,
+    }
 
     # Weighted identity confidence: BVN 35%, Liveness 35%, NIN 20%, Phone 10%
     identity_confidence = (
-        bvn_conf * 0.35
-        + liveness_val * 0.35
-        + nin_valid * 0.20
-        + phone_match * 0.10
+        bvn_confidence * 0.35
+        + liveness_score * 0.35
+        + (1 - nin_watchlisted) * 0.20
+        + phone_name_match * 0.10
     )
-
-    # AML risk level — Dojah returns int 0/1/2 or string
-    aml_level = aml_result.get("risk_level", 0) if "error" not in aml_result else 0
-    try:
-        aml_high = int(aml_level) >= 2
-    except (TypeError, ValueError):
-        aml_high = str(aml_level).lower() in ("high", "2")
 
     # KYC status determination (hard-block overrides confidence threshold)
     flags: list[str] = []
     if nin_watchlisted:
         flags.append("NIN flagged on watchlist")
-    if aml_high:
+    if aml_risk_level >= 2:
         flags.append("AML watchlist hit")
     if not bvn_result.get("match") and "error" not in bvn_result:
         flags.append("BVN name mismatch")
-    if liveness_val < 0.5:
+    if liveness_score < 0.5:
         flags.append("Liveness check failed")
 
-    if nin_watchlisted or aml_high:
+    if nin_watchlisted or aml_risk_level >= 2:
         kyc_status = "blocked"
     elif identity_confidence >= 0.7:
         kyc_status = "verified"
@@ -74,6 +95,7 @@ async def onboard(payload: OnboardRequest, db: Session = Depends(get_db)):
         email=str(payload.email),
         kyc_status=kyc_status,
         identity_confidence=identity_confidence,
+        kyc_signals=kyc_signals,
     )
     db.add(user)
     db.commit()

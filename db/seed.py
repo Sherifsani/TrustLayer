@@ -42,6 +42,14 @@ def seed_adaeze(db) -> None:
         email="adaeze@trustlayer.demo",
         kyc_status="verified",
         identity_confidence=0.94,
+        kyc_signals={
+            "bvn_confidence": 0.97,
+            "nin_watchlisted": 0,
+            "liveness_score": 0.91,
+            "doc_authentic": 1,
+            "phone_name_match": 1,
+            "aml_risk_level": 0,
+        },
         created_at=_days_ago(95),
     )
     db.add(adaeze)
@@ -109,6 +117,14 @@ def seed_emeka(db) -> None:
         email="emeka@trustlayer.demo",
         kyc_status="failed",
         identity_confidence=0.41,
+        kyc_signals={
+            "bvn_confidence": 0.38,
+            "nin_watchlisted": 0,
+            "liveness_score": 0.42,
+            "doc_authentic": 1,
+            "phone_name_match": 0,
+            "aml_risk_level": 1,
+        },
         created_at=_days_ago(10),
     )
     db.add(emeka)

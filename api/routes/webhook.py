@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
@@ -64,17 +65,21 @@ async def squad_webhook(
                 Report.id == _uuid.UUID(report_id_str)
             ).first()
             if report:
-                report.status = "generating"
-                db.commit()
-                from api.celery_app import generate_report
-                generate_report.delay(report_id_str)
+                from api.celery_app import generate_report, generate_report_now
+                if os.getenv("REDIS_URL"):
+                    generate_report.delay(report_id_str)
+                else:
+                    generate_report_now(report_id_str)
         except Exception as exc:
             logger.error("Failed to process report payment: %s", exc)
 
     # Fire-and-forget — never let Celery/Redis errors block the 200 response
     try:
-        from api.celery_app import recompute_score
-        recompute_score.delay(str(user.id), business_id="system")
+        from api.celery_app import recompute_score, recompute_score_now
+        if os.getenv("REDIS_URL"):
+            recompute_score.delay(str(user.id), business_id="system")
+        else:
+            recompute_score_now(str(user.id), business_id="system")
     except Exception as exc:
         logger.error("Failed to dispatch recompute_score task: %s", exc)
 

@@ -1,4 +1,6 @@
 .env
+.env.local
+*.db
 __pycache__/
 *.py[cod]
 trustlayer/ml/models/*.pkl

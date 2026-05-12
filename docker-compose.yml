@@ -1,0 +1,42 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: trustlayer
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: .
+    command: bash -lc "alembic upgrade head || true; python ml/generate_data.py || true; python ml/train.py || true; python db/seed.py || true; uvicorn api.main:app --host 0.0.0.0 --port 8000"
+    env_file: .env
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+
+  worker:
+    build: .
+    command: bash -lc "celery -A api.celery_app worker --loglevel=info"
+    env_file: .env
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  pgdata:

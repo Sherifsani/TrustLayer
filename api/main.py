@@ -14,9 +14,15 @@ app = FastAPI(title="TrustLayer API", version="1.0.0")
 
 # CORS — open in development, locked to frontend origin in production
 _env = os.getenv("ENVIRONMENT", "development")
+_local_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if _env == "development" else ["https://trustlayer.app"],
+    allow_origins=["*"] if _env == "development" else ["https://trustlayer.app", *_local_origins],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

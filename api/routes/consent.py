@@ -70,11 +70,17 @@ async def get_consents(
     if str(current_user.id) != user_id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
+    from uuid import UUID
+    try:
+        user_uuid = UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user_id format")
+
     now = datetime.utcnow()
     records = (
         db.query(Consent)
         .filter(
-            Consent.user_id == user_id,
+            Consent.user_id == user_uuid,
             Consent.revoked == False,
         )
         .all()

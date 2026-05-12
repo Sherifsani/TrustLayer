@@ -14,7 +14,10 @@ class User(Base):
     bvn_hash = Column(String, nullable=False)
     nin_hash = Column(String, nullable=False)
     phone = Column(String, nullable=False)
-    email = Column(String, nullable=False)
+    bvn_hash = Column(String, nullable=False, unique=True, index=True)
+    nin_hash = Column(String, nullable=False, unique=True, index=True)
+    phone = Column(String, nullable=False)
+    email = Column(String, nullable=False, unique=True, index=True)
     kyc_status = Column(String, default="pending")   # pending | verified | failed | blocked
     identity_confidence = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)

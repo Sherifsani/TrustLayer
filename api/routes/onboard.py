@@ -88,6 +88,32 @@ async def onboard(payload: OnboardRequest, db: Session = Depends(get_db)):
     bvn_hash = hashlib.sha256(payload.bvn.encode()).hexdigest()
     nin_hash = hashlib.sha256(payload.nin.encode()).hexdigest()
 
+    # Prevent duplicate users: if a user with the same BVN/NIN/email exists, update and return that record
+    existing = (
+        db.query(User)
+        .filter(
+            (User.bvn_hash == bvn_hash) | (User.nin_hash == nin_hash) | (User.email == str(payload.email))
+        )
+        .first()
+    )
+
+    if existing:
+        # Update KYC fields where appropriate and return existing user_id
+        existing.kyc_status = kyc_status
+        existing.identity_confidence = identity_confidence
+        existing.kyc_signals = kyc_signals
+        existing.phone = payload.phone
+        existing.first_name = payload.first_name
+        existing.last_name = payload.last_name
+        db.commit()
+        db.refresh(existing)
+        return OnboardResponse(
+            user_id=str(existing.id),
+            kyc_status=kyc_status,
+            identity_confidence=round(identity_confidence, 4),
+            flags=flags,
+        )
+
     user = User(
         bvn_hash=bvn_hash,
         nin_hash=nin_hash,
@@ -96,6 +122,8 @@ async def onboard(payload: OnboardRequest, db: Session = Depends(get_db)):
         kyc_status=kyc_status,
         identity_confidence=identity_confidence,
         kyc_signals=kyc_signals,
+        first_name=payload.first_name,
+        last_name=payload.last_name,
     )
     db.add(user)
     db.commit()

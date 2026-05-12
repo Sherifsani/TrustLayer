@@ -92,4 +92,6 @@ class Report(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     file_url = Column(String, nullable=True)
 
+    content = Column(JSON, nullable=True)
+
     user = relationship("User", back_populates="reports")

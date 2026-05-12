@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from db.session import SessionLocal
-from api.models.db_models import User, SquadEvent, TrustScore, Report
+from api.models.db_models import User, SquadEvent, TrustScore, Report, Consent
 
 # ── helpers ────────────────────────────────────────────────────────────────
 
@@ -109,6 +109,9 @@ def seed_adaeze(db) -> None:
     # Seed reports
     _seed_adaeze_reports(db, adaeze)
 
+    # Seed consents
+    _seed_adaeze_consents(db, adaeze)
+
 
 def _seed_adaeze_scores(db, user) -> None:
     historical_count = db.query(TrustScore).filter(
@@ -187,6 +190,48 @@ def _seed_adaeze_reports(db, user) -> None:
         db.add(r)
     db.commit()
     print("  ✓ Adaeze — 3 report records seeded")
+
+
+def _seed_adaeze_consents(db, user) -> None:
+    if db.query(Consent).filter(Consent.user_id == user.id).count() >= 3:
+        print("  Adaeze consents already seeded — skipping.")
+        return
+
+    db.query(Consent).filter(Consent.user_id == user.id).delete()
+    
+    consents = [
+        Consent(
+            user_id=user.id,
+            business_id="sterling_microfinance",
+            granted_signals=["trust_score", "squad_history", "identity_vault"],
+            denied_signals=[],
+            granted_at=_date(2026, 4, 8),
+            expires_at=_date(2026, 5, 8),
+            revoked=False,
+        ),
+        Consent(
+            user_id=user.id,
+            business_id="renmoney",
+            granted_signals=["trust_score", "telco_data"],
+            denied_signals=["squad_history", "identity_vault"],
+            granted_at=_date(2026, 4, 22),
+            expires_at=None,
+            revoked=False,
+        ),
+        Consent(
+            user_id=user.id,
+            business_id="andela_talent",
+            granted_signals=["trust_score", "identity_vault"],
+            denied_signals=["telco_data", "squad_history"],
+            granted_at=_date(2026, 3, 30),
+            expires_at=_date(2026, 6, 30),
+            revoked=False,
+        ),
+    ]
+    for c in consents:
+        db.add(c)
+    db.commit()
+    print("  ✓ Adaeze — 3 consent records seeded")
 
 
 # ── Emeka Eze ── usr_emeka001 ───────────────────────────────────────────────

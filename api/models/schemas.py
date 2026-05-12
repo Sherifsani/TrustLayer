@@ -80,6 +80,7 @@ class TrustScoreResult(BaseModel):
     drivers: List[str]
     signals_used: List[str]
     computed_at: datetime
+    raw_features: Optional[dict] = None
 
 
 # --- Webhook ---

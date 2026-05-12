@@ -113,12 +113,14 @@ async def compute_trust_score(user_id: str, business_id: str, db: Session) -> Tr
             db, resolved_id, score=0, risk="blocked",
             drivers=["NIN watchlist status → blocked"],
             signals_used=signals_used,
+            raw_features=features,
         )
     if kyc_features["aml_risk_level"] == 2:
         return _save_and_return(
             db, resolved_id, score=0, risk="blocked",
             drivers=["AML risk screening → blocked"],
             signals_used=signals_used,
+            raw_features=features,
         )
 
     # 6. Base score from GradientBoostingClassifier
@@ -162,6 +164,7 @@ async def compute_trust_score(user_id: str, business_id: str, db: Session) -> Tr
         drivers=drivers, signals_used=signals_used,
         reliability_score=reliability_score,
         authenticity_score=authenticity_score,
+        raw_features=features,
     )
 
 
@@ -174,6 +177,7 @@ def _save_and_return(
     signals_used: list,
     reliability_score: int = 0,
     authenticity_score: int = 0,
+    raw_features: dict = None,
 ) -> TrustScoreResult:
     now = datetime.utcnow()
     record = TrustScoreModel(
@@ -197,4 +201,5 @@ def _save_and_return(
         drivers=drivers,
         signals_used=signals_used,
         computed_at=now,
+        raw_features=raw_features,
     )

@@ -49,27 +49,45 @@ def predict_score(features: dict) -> float:
     return prob * 100
 
 
-def explain_score(features: dict) -> list[str]:
+def _shap_vals_and_ranked(features: dict):
+    """Shared SHAP computation used by explain_score and get_shap_details."""
     _load()
     x = np.array([[features.get(f, 0.5) for f in FEATURE_NAMES]])
     shap_vals = _explainer.shap_values(x)
-
-    # TreeExplainer returns list-of-arrays for some models, plain array for others
     if isinstance(shap_vals, list):
-        vals = shap_vals[1][0]  # class 1 (trustworthy)
+        vals = shap_vals[1][0]
     else:
         vals = shap_vals[0]
-
     ranked = sorted(zip(FEATURE_NAMES, vals), key=lambda t: abs(t[1]), reverse=True)
-
-    # Normalise to ±99 so display is readable regardless of log-odds magnitude
     max_abs = max(abs(v) for _, v in ranked) or 1.0
+    return ranked, max_abs
 
+
+def explain_score(features: dict) -> list[str]:
+    ranked, max_abs = _shap_vals_and_ranked(features)
     drivers = []
     for feat, val in ranked[:3]:
         label = FEATURE_DISPLAY_NAMES[feat]
         pts = round(val / max_abs * 99)
         prefix = "+" if pts >= 0 else ""
         drivers.append(f"{label} → {prefix}{pts} pts")
-
     return drivers
+
+
+def get_shap_details(features: dict) -> list[dict]:
+    """Return all 15 features sorted by absolute SHAP contribution (descending).
+
+    Each entry: {feature, display_name, value, contribution (−99..+99), direction}
+    """
+    ranked, max_abs = _shap_vals_and_ranked(features)
+    result = []
+    for feat, val in ranked:
+        pts = round(val / max_abs * 99)
+        result.append({
+            "feature": feat,
+            "display_name": FEATURE_DISPLAY_NAMES[feat],
+            "value": round(features.get(feat, 0.5), 4),
+            "contribution": pts,
+            "direction": "positive" if pts >= 0 else "negative",
+        })
+    return result

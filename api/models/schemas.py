@@ -188,3 +188,27 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str
     user_id: str
+
+
+# --- Credit profile ---
+
+class CreditSignals(BaseModel):
+    transaction_volume: float
+    income_consistency: float
+    avg_monthly_balance: float
+
+
+class CreditComponentScores(BaseModel):
+    transaction_volume_score: float
+    income_consistency_score: float
+    avg_balance_score: float
+
+
+class CreditProfileResponse(BaseModel):
+    user_id: str
+    mono_account_id: str
+    trust_score: int
+    signals: CreditSignals
+    component_scores: CreditComponentScores
+    statement_source: str
+    income_source: str

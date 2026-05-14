@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 load_dotenv()
 
-from api.routes import activity, auth, consent, onboard, report, reports, score, score_history, user, webhook
+from api.routes import activity, auth, consent, onboard, report, reports, score, score_history, user, webhook, mono
 from db.session import SessionLocal
 
 app = FastAPI(title="TrustLayer API", version="1.0.0")
@@ -16,8 +16,13 @@ app = FastAPI(title="TrustLayer API", version="1.0.0")
 _env = os.getenv("ENVIRONMENT", "development")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if _env == "development" else ["https://trustlayer.app"],
-    allow_credentials=True,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ] if _env == "development" else ["https://trustlayer.app"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -32,6 +37,7 @@ app.include_router(user.router)
 app.include_router(score_history.router)
 app.include_router(activity.router)
 app.include_router(reports.router)
+app.include_router(mono.router)
 
 
 @app.get("/")

@@ -1,13 +1,23 @@
 import asyncio
 import hashlib
+import os
+from datetime import datetime, timedelta
 
+from dotenv import load_dotenv
 from fastapi import APIRouter, Depends
+from jose import jwt
 from sqlalchemy.orm import Session
+
+load_dotenv()
 
 from api.models.db_models import User
 from api.models.schemas import OnboardRequest, OnboardResponse
 from db.session import get_db
 from integrations import dojah
+from ml.pipeline import compute_trust_score
+
+SECRET_KEY = os.getenv("SECRET_KEY", "")
+ALGORITHM = "HS256"
 
 router = APIRouter()
 
@@ -22,32 +32,47 @@ async def onboard(payload: OnboardRequest, db: Session = Depends(get_db)):
         dojah.screen_aml(payload.first_name, payload.last_name, dob=None),
     )
 
-    # Extract individual KYC signal values — degrade gracefully to neutral if any call failed
-    bvn_confidence = (
-        bvn_result.get("entity", {}).get("bvn", {}).get("confidence_value", 50) / 100
-        if "error" not in bvn_result else 0.5
-    )
+    # Extract individual KYC signal values — degrade gracefully to neutral if any call failed.
+    # Each dojah.* function returns the entity dict directly (already unwrapped from the response).
 
-    nin_entity = nin_result.get("entity", {}) if "error" not in nin_result else {}
+    # BVN: confidence lives in entity.first_name.confidence_value and entity.last_name.confidence_value
+    if "error" not in bvn_result:
+        fn_conf = bvn_result.get("first_name", {}).get("confidence_value", 50)
+        ln_conf = bvn_result.get("last_name", {}).get("confidence_value", 50)
+        bvn_confidence = (fn_conf + ln_conf) / 200
+    else:
+        bvn_confidence = 0.5
+
+    # NIN: sandbox doesn't return watch_listed — defaults to not watchlisted
+    nin_entity = nin_result if "error" not in nin_result else {}
     nin_watchlisted = 1 if str(nin_entity.get("watch_listed", "NO")).upper() == "YES" else 0
 
-    liveness_score = (
-        liveness_result.get("entity", {}).get("confidence_value", 50) / 100
-        if "error" not in liveness_result else 0.5
-    )
+    # Liveness: entity.face.liveness.{spoof, confidence}
+    # spoof=false + high confidence → real person; spoof=true → fake
+    if "error" not in liveness_result:
+        liveness_data = liveness_result.get("face", {}).get("liveness", {})
+        is_spoof = liveness_data.get("spoof", True)
+        confidence = liveness_data.get("confidence", 0) / 100
+        liveness_score = (1 - confidence) if is_spoof else confidence
+    else:
+        liveness_score = 0.5
 
     doc_authentic = 1  # no document uploaded at onboard yet — default to authentic
 
-    phone_entity = phone_result.get("entity", {}) if "error" not in phone_result else {}
+    # Phone: returns 302 in sandbox so degrades gracefully; entity has first_name directly
+    phone_entity = phone_result if "error" not in phone_result else {}
     phone_first = str(phone_entity.get("first_name", "")).upper()
     provided_first = str(payload.first_name).upper()
     phone_name_match = 1 if phone_first and phone_first in provided_first else 0
 
-    aml_entity = aml_result.get("entity", {}) if (
-        "error" not in aml_result and isinstance(aml_result.get("entity"), dict)
-    ) else {}
-    aml_risk_raw = str(aml_entity.get("risk_level", "low")).lower()
-    aml_risk_level = {"low": 0, "medium": 1, "high": 2}.get(aml_risk_raw, 0)
+    # AML: entity.matchResults[] with nameMatchScore — no risk_level field
+    aml_entity = aml_result if "error" not in aml_result and isinstance(aml_result, dict) else {}
+    match_results = aml_entity.get("matchResults", [])
+    if not match_results:
+        aml_risk_level = 0
+    else:
+        max_score = max(m.get("nameMatchScore", 0) for m in match_results)
+        aml_risk_level = 2 if max_score >= 85 else 1
 
     kyc_signals = {
         "bvn_confidence": bvn_confidence,
@@ -72,7 +97,9 @@ async def onboard(payload: OnboardRequest, db: Session = Depends(get_db)):
         flags.append("NIN flagged on watchlist")
     if aml_risk_level >= 2:
         flags.append("AML watchlist hit")
-    if not bvn_result.get("match") and "error" not in bvn_result:
+    bvn_fn_match = bvn_result.get("first_name", {}).get("status", False)
+    bvn_ln_match = bvn_result.get("last_name", {}).get("status", False)
+    if "error" not in bvn_result and not (bvn_fn_match and bvn_ln_match):
         flags.append("BVN name mismatch")
     if liveness_score < 0.5:
         flags.append("Liveness check failed")
@@ -101,9 +128,18 @@ async def onboard(payload: OnboardRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
+    await compute_trust_score(str(user.id), business_id="system", db=db)
+
+    token = jwt.encode(
+        {"sub": str(user.id), "exp": datetime.utcnow() + timedelta(hours=24)},
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
     return OnboardResponse(
         user_id=str(user.id),
         kyc_status=kyc_status,
         identity_confidence=round(identity_confidence, 4),
         flags=flags,
+        access_token=token,
     )

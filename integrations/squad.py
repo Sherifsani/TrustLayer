@@ -34,7 +34,6 @@ async def initiate_payment(amount_kobo: int, email: str, ref: str, callback_url:
                     "email": email,
                     "transaction_ref": ref,
                     "callback_url": callback_url,
-                    "currency_id": "NGN",
                 },
                 timeout=15,
             )

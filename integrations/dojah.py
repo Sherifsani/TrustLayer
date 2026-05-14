@@ -50,9 +50,9 @@ async def liveness_check(selfie_base64: str, bvn: str) -> dict:
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                f"{BASE_URL}/api/v1/kyc/selfie",
+                f"{BASE_URL}/api/v1/ml/liveness/",
                 headers=_headers(),
-                json={"selfie": selfie_base64, "bvn": bvn},
+                json={"image": selfie_base64},
                 timeout=15,
             )
             resp.raise_for_status()

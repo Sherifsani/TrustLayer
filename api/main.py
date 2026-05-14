@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 load_dotenv()
 
-from api.routes import activity, auth, consent, onboard, report, reports, score, score_history, user, webhook
+from api.routes import activity, auth, consent, onboard, org, report, reports, score, score_history, user, webhook
 from db.session import SessionLocal
 
 app = FastAPI(title="TrustLayer API", version="1.0.0")
@@ -32,6 +32,7 @@ app.include_router(user.router)
 app.include_router(score_history.router)
 app.include_router(activity.router)
 app.include_router(reports.router)
+app.include_router(org.router)
 
 
 @app.get("/")

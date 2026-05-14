@@ -41,7 +41,7 @@ def generate_report(report_id: str) -> None:
         report = db.query(Report).filter(Report.id == _uuid.UUID(report_id)).first()
         if report:
             report.status = "ready"
-            report.file_url = f"https://trustlayer.demo/reports/{report_id}.pdf"
+            report.file_url = f"/report/download/{report_id}"
             db.commit()
     finally:
         db.close()

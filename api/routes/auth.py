@@ -15,8 +15,8 @@ SECRET_KEY = os.getenv("SECRET_KEY", "")
 ALGORITHM = "HS256"
 
 DEMO_USERS = {
-    "adaeze@trustlayer.demo": {"password": "demo1234", "user_id": "usr_adaeze001"},
-    "emeka@trustlayer.demo":  {"password": "demo1234", "user_id": "usr_emeka001"},
+    "adaeze@trustlayer.ng": {"password": "demo1234", "user_id": "usr_adaeze001"},
+    "emeka@trustlayer.ng":  {"password": "demo1234", "user_id": "usr_emeka001"},
 }
 
 

@@ -22,6 +22,7 @@ class OnboardResponse(BaseModel):
     kyc_status: str
     identity_confidence: float
     flags: List[str]
+    access_token: str
 
 
 # --- Score ---
@@ -175,6 +176,22 @@ class InitiatePaymentResponse(BaseModel):
     checkout_url: str
     txn_ref: str
     amount: int
+
+
+# --- Org ---
+
+class OrgDisburseRequest(BaseModel):
+    user_id: str
+    amount_kobo: int
+    bank_code: str
+    account_number: str
+
+
+class OrgDisburseResponse(BaseModel):
+    status: str          # approved | blocked | failed
+    message: str
+    transfer_ref: Optional[str] = None
+    risk_level: Optional[str] = None
 
 
 # --- Auth ---

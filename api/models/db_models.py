@@ -15,6 +15,7 @@ class User(Base):
     nin_hash = Column(String, nullable=False)
     phone = Column(String, nullable=False)
     email = Column(String, nullable=False)
+    mono_account_id = Column(String, nullable=True, index=True)
     kyc_status = Column(String, default="pending")   # pending | verified | failed | blocked
     identity_confidence = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
